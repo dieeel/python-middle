@@ -1,0 +1,56 @@
+version: "3.7"
+
+services:
+  redis:
+    image: redis:7.0.6-alpine
+    container_name: ${CONTAINER_PREFIX:-python-middle-}redis
+    restart: unless-stopped
+    networks:
+      - python-middle
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data-volume:/data
+      - redis-log-volume:/var/log/redis
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    environment:
+      - TZ=${TZ-Asia/Tokyo}
+    logging:
+      driver: "json-file"
+      options:
+        max-size: ${JSON_FILE_MAX_SIZE:-100m}
+
+  note:
+    platform: linux/x86_64
+    image: python-middle/note:${PYTHON_MIDDLE_VERSION:-latest}
+    build:
+        context: .
+        dockerfile: Dockerfile
+    container_name: ${CONTAINER_PREFIX:-python-middle-}note
+    networks:
+      - python-middle
+    ports:
+      - "8888:8888"
+    volumes:
+      - ./note:/var/note
+    working_dir: /var/note
+    environment:
+      - TZ=${TZ-Asia/Tokyo}
+    command: jupyter notebook --ip=0.0.0.0 --allow-root --NotebookApp.token='${NOTE_TOKEN:-ppp}'
+    depends_on:
+      redis:
+        condition: service_healthy
+
+networks:
+  python-middle:
+    driver: bridge
+
+volumes:
+  redis-data-volume:
+  redis-log-volume:
+    driver: local
+
